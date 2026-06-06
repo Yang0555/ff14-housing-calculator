@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FF14 房屋抽獎概率計算工具 | FF14 Housing Lottery Calculator</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Tesseract.js CDN for client-side OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Header Section with Animated Eorzea Crystal -->
+    <header>
+      <svg class="crystal-icon" viewBox="0 0 100 100" width="54" height="54">
+        <defs>
+          <linearGradient id="crystal-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#00e5ff" />
+            <stop offset="50%" stop-color="#7c4dff" />
+            <stop offset="100%" stop-color="#e040fb" />
+          </linearGradient>
+          <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+        <polygon points="50,5 90,35 90,65 50,95 10,65 10,35" fill="none" stroke="url(#crystal-grad)" stroke-width="2.5" filter="url(#glow)" />
+        <polygon points="50,5 50,50 90,35" fill="rgba(0, 229, 255, 0.25)" stroke="url(#crystal-grad)" stroke-width="1" />
+        <polygon points="90,35 50,50 90,65" fill="rgba(124, 77, 255, 0.15)" stroke="url(#crystal-grad)" stroke-width="1" />
+        <polygon points="90,65 50,50 50,95" fill="rgba(224, 64, 251, 0.25)" stroke="url(#crystal-grad)" stroke-width="1" />
+        <polygon points="50,95 50,50 10,65" fill="rgba(124, 77, 255, 0.2)" stroke="url(#crystal-grad)" stroke-width="1" />
+        <polygon points="10,65 50,50 10,35" fill="rgba(0, 229, 255, 0.15)" stroke="url(#crystal-grad)" stroke-width="1" />
+        <polygon points="10,35 50,50 50,5" fill="rgba(224, 64, 251, 0.3)" stroke="url(#crystal-grad)" stroke-width="1" />
+      </svg>
+      <div class="header-content">
+        <h1>FF14 房屋抽獎概率計算工具</h1>
+        <p>上傳或貼上試算表截圖，自動辨識計算每間房屋中獎機率與多間房屋綜合概率</p>
+      </div>
+    </header>
+
+    <!-- Main Application Grid -->
+    <div class="app-grid">
+      
+      <!-- LEFT COLUMN: Inputs & Entries List -->
+      <div class="input-panel-container">
+        
+        <!-- Panel 1: OCR Upload Area -->
+        <div class="panel">
+          <div class="panel-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            1. 匯入試算表截圖
+          </div>
+          
+          <div class="upload-zone" id="upload-zone">
+            <!-- OCR Spinner and Progress Overlay -->
+            <div class="ocr-loader" id="ocr-loader">
+              <div class="spinner"></div>
+              <div class="progress-container">
+                <div class="progress-bar" id="ocr-progress"></div>
+              </div>
+              <div class="ocr-status-text" id="ocr-status-text">初始化辨識引擎...</div>
+            </div>
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="16 16 12 12 8 16"></polyline>
+              <line x1="12" y1="12" x2="12" y2="21"></line>
+              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path>
+              <polyline points="16 16 12 12 8 16"></polyline>
+            </svg>
+            <p>拖曳截圖至此，或點擊此處上傳圖片</p>
+            <span>支援剪貼簿直接貼上圖片 (Ctrl + V)</span>
+            <input type="file" id="file-input" accept="image/*">
+          </div>
+
+          <!-- Collapsible Raw OCR Result Area -->
+          <div class="collapsible-trigger" id="ocr-trigger">
+            <span>檢視 / 編輯辨識出的原始文字 (OCR Raw Text)</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </div>
+          <div class="collapsible-content" id="ocr-content">
+            <textarea id="raw-ocr-text" placeholder="辨識出的原始文字會顯示在此，你也可以手動在此貼上 `/li Mist 18 42 2` 這類的文字格式來進行解析..."></textarea>
+            <div class="text-btn-row">
+              <button class="btn" id="parse-text-btn">手動解析文字內容</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel 2: Table Editor -->
+        <div class="panel">
+          <div class="panel-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            2. 房屋抽獎清單
+          </div>
+
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>房屋地區與房號 (/li)</th>
+                  <th style="text-align: center;">總抽獎人數 (N)</th>
+                  <th style="text-align: center;">我的抽數 (M)</th>
+                  <th style="text-align: right;">單間機率</th>
+                  <th style="text-align: center; width: 50px;">操作</th>
+                </tr>
+              </thead>
+              <tbody id="entries-body">
+                <!-- Rows injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+
+          <div class="action-row">
+            <button class="btn btn-primary" id="add-row-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              手動新增房屋
+            </button>
+            <button class="btn" id="load-example-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path></svg>
+              載入範例數據
+            </button>
+            <button class="btn btn-danger-outline" id="clear-all-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+              清空全部
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN: Results & Statistics -->
+      <div class="results-panel-container">
+        
+        <!-- Large Gauge Card: Win At Least 1 -->
+        <div class="summary-card">
+          <div class="gauge-container">
+            <svg class="progress-ring" width="170" height="170">
+              <defs>
+                <linearGradient id="ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#00e5ff" />
+                  <stop offset="100%" stop-color="#7c4dff" />
+                </linearGradient>
+              </defs>
+              <circle class="progress-ring-bg" stroke="rgba(255, 255, 255, 0.05)" stroke-width="12" fill="transparent" r="74" cx="85" cy="85" />
+              <circle class="progress-ring-bar" id="gauge-bar" stroke="url(#ring-grad)" stroke-width="12" stroke-linecap="round" fill="transparent" r="74" cx="85" cy="85" stroke-dasharray="464.95" stroke-dashoffset="464.95" />
+            </svg>
+            <div class="gauge-value">
+              <div class="gauge-number" id="gauge-percent">0.00%</div>
+              <div class="gauge-label">獲得任一房產</div>
+            </div>
+          </div>
+          <div class="summary-text">
+            <h3 id="summary-title">準備計算機率</h3>
+            <p id="summary-desc">請於左側輸入房屋 lottery 數據，我們將計算您獲得至少一間房子的整體機率。</p>
+            <span class="summary-badge" id="summary-badge" style="display: none;">中等機率</span>
+          </div>
+        </div>
+
+        <!-- Detailed Individual Probabilities -->
+        <div class="panel">
+          <div class="panel-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+            單間房中獎率排行
+          </div>
+          <div class="house-list" id="house-list-container">
+            <!-- Dynamic items -->
+            <div class="empty-state">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              <p>尚無房屋清單</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compound Probabilities (Winning K houses) -->
+        <div class="panel">
+          <div class="panel-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            中 O 間房機率分佈
+          </div>
+
+          <div class="dist-toggle">
+            <button class="toggle-btn active" id="toggle-at-least" onclick="switchDistMode('at-least')">累計中獎率 (至少中 K 間)</button>
+            <button class="toggle-btn" id="toggle-exactly" onclick="switchDistMode('exactly')">精確中獎率 (剛好中 K 間)</button>
+          </div>
+
+          <div class="dist-list" id="dist-list-container">
+            <!-- Dynamic items -->
+            <div class="empty-state">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <p>無分配數據，請先新增房屋</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Footer & System Diagnostics -->
+    <footer>
+      <div>&copy; 2026 Eorzea Housing Lottery Calculator. Designed for FF14 Housing Lottery.</div>
+      <div class="system-badge-container">
+        系統狀態: <span class="system-badge" id="diag-btn" onclick="openModal()">驗證程式 (OK)</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Diagnostics Dialog Modal -->
+  <div class="modal-overlay" id="modal-overlay" onclick="closeModalOnOverlay(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">程式自我診斷與數學公式驗證</div>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          以下是在瀏覽器中直接執行的自我測試，用於驗證 OCR 解析器和泊松二項式分布 (Poisson Binomial Distribution) 動態規劃數學引擎是否運行正確。
+        </p>
+        <div class="diagnostic-log" id="diag-log">
+          <!-- Diagnostics log injected here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
